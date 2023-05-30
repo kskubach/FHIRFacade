@@ -1,0 +1,1093 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26" zv="IRIS for Windows (x86-64) 2022.3 (Build 606U)" ts="2023-05-27 14:40:10">
+<Class name="FHIRFacade.BO.Database">
+<Super>Ens.BusinessOperation</Super>
+<TimeChanged>66619,44262.1015475</TimeChanged>
+<TimeCreated>66575,81196.7226451</TimeCreated>
+
+<Parameter name="ADAPTER">
+<Default>Ens.OutboundAdapter</Default>
+</Parameter>
+
+<Property name="Adapter">
+<Type>Ens.OutboundAdapter</Type>
+</Property>
+
+<Parameter name="INVOCATION">
+<Default>Queue</Default>
+</Parameter>
+
+<Method name="Patient">
+<FormalSpec>pRequest:FHIRFacade.REQ.Patient,*pResponse:FHIRFacade.RES.Patient</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	#dim Err as %Exception.AbstractException
+	try {
+		set pResponse=##class(FHIRFacade.RES.Patient).%New()
+    	
+    	//----------------------
+    	// Create a new patient
+    	//----------------------
+		if pRequest.Action="Add" {
+			set SSN=pRequest.SSN
+			&sql(select ID into :ID from FHIRFacade_Table.Patient where SSN=:SSN)
+			if SQLCODE=100 {
+				// New Patient
+		        set obj=##class(FHIRFacade.Table.Patient).%New()
+		        set obj.SSN 		= pRequest.SSN
+		        set obj.FirstName 	= pRequest.FirstName
+		        set obj.LastName 	= pRequest.LastName
+		        set obj.Gender 		= pRequest.Gender
+		        set obj.Deceased 	= pRequest.Deceased
+		        if obj.%Save() {
+			        set pResponse.Success=1
+			        set pResponse.PatientData.InternalId=obj.%Id()
+		        }
+		        else {
+			        set pResponse.Success=0
+			        set pResponse.ErrorMessage=$system.Status.GetErrorText(tStatus)
+		        }
+	   		}
+	   		else {
+		        set pResponse.Success=0
+		        set pResponse.ErrorMessage="Patient with SSN '"_pRequest.SSN_"' already exists"
+	   		}
+		}
+    	//----------------------------
+		// Delete an existing patient
+    	//----------------------------
+		elseif pRequest.Action="Delete" {
+	    	if ##class(FHIRFacade.Table.Patient).%ExistsId(pRequest.InternalId) {
+				// Patient Found
+		        set tStatus=##class(FHIRFacade.Table.Patient).%DeleteId(pRequest.InternalId)
+		        if $$$ISOK(tStatus) {
+			        set pResponse.Success=1
+		        }
+		        else {
+			        set pResponse.Success=0
+			        set pResponse.ErrorMessage=$system.Status.GetErrorText(tStatus)
+		        }
+	    	}
+	   		else {
+		        set pResponse.Success=0
+		        set pResponse.ErrorMessage="Patient with id '"_pRequest.InternalId_"' does not exist"
+	   		}
+		}
+    	//------------------------------------
+		// Get details of an existing patient
+    	//------------------------------------
+		elseif pRequest.Action="Read" {
+	    	if ##class(FHIRFacade.Table.Patient).%ExistsId(pRequest.InternalId) {
+				// Found Patient
+		        set obj=##class(FHIRFacade.Table.Patient).%OpenId(pRequest.InternalId)
+		        set pResponse.PatientData.InternalId 	= obj.%Id()
+		        set pResponse.PatientData.SSN 			= obj.SSN
+		        set pResponse.PatientData.FirstName 	= obj.FirstName
+		        set pResponse.PatientData.LastName 		= obj.LastName
+		        set pResponse.PatientData.Gender 		= obj.Gender
+		        set pResponse.PatientData.Deceased 		= obj.Deceased
+	    	}
+	   		else {
+		        set pResponse.Success=0
+		        set pResponse.ErrorMessage="Patient with id '"_pRequest.InternalId_"' was not found"
+	   		}
+		}
+		else {
+	        set pResponse.Success=0
+	        set pResponse.ErrorMessage="Invalid action '"_pRequest.Action_"'"
+		}
+
+	}
+	catch Err {
+		set tStatus=Err.AsStatus()
+		set pResponse.Success=0
+		set pResponse.ErrorMessage=$system.Status.GetErrorText(tStatus)
+	}
+	Quit $$$OK
+]]></Implementation>
+</Method>
+
+<Method name="PatientSearch">
+<FormalSpec>pRequest:FHIRFacade.REQ.PatientSearch,*pResponse:FHIRFacade.RES.PatientSearch</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	#dim Err as %Exception.AbstractException
+	try {
+		set pResponse=##class(FHIRFacade.RES.PatientSearch).%New()
+    	
+    	//------------------------
+		// Built the WHERE clause
+    	//------------------------
+		set tWhere=""
+		if pRequest.SSN'="" {
+			set tWhere="SSN='"_pRequest.SSN_"' "
+		}
+		if pRequest.Gender'="" {
+			if tWhere'="" set tWhere=tWhere_" AND Gender='"_pRequest.Gender_"' "
+			else  set tWhere="Gender='"_pRequest.Gender_"' "
+		}
+		if pRequest.LastName'="" {
+			if tWhere'="" set tWhere=tWhere_" AND LastName like '"_pRequest.LastName_"%' "
+			else  set tWhere="LastName like '"_pRequest.LastName_"%' "
+		}
+		
+		if tWhere="" {
+			set pResponse.Success=0
+			set pResponse.ErrorMessage="No search parameters"
+			quit
+		}
+		
+		$$$TRACE(tWhere)
+
+    	//---------------------------
+		// Execute the SQL statement
+    	//---------------------------
+		set tResultset=##class(%ResultSet).%New("%DynamicQuery:SQL")
+		set SQL = "SELECT ID,FirstName,LastName,SSN,Gender,Deceased FROM FHIRFacade_Table.Patient WHERE "_tWhere
+  		set tStatus = tResultset.Prepare(SQL)
+		if $$$ISERR(tStatus)="" {
+			set pResponse.Success=0
+			set pResponse.ErrorMessage=$system.Status.GetErrorText(tStatus)
+			quit
+		}
+		set tStatus=tResultset.Execute()
+		if $$$ISERR(tStatus)="" {
+			set pResponse.Success=0
+			set pResponse.ErrorMessage=$system.Status.GetErrorText(tStatus)
+			quit
+		}
+		
+    	//---------------------------------------
+		// Fill the results list in the resposne
+    	//---------------------------------------
+		while tResultset.Next() {
+			set tPatient=##class(FHIRFacade.RES.PatientData).%New()
+			set tPatient.InternalId	=tResultset.Get("ID")
+			set tPatient.FirstName	=tResultset.Get("FirstName")
+			set tPatient.LastName	=tResultset.Get("LastName")
+			set tPatient.Gender		=tResultset.Get("Gender")
+			set tPatient.SSN		=tResultset.Get("SSN")
+			set tPatient.Deceased	=tResultset.Get("Deceased")
+			do pResponse.Patients.Insert(tPatient)
+			kill tPatient
+		}
+	}
+	catch Err {
+		set tStatus=Err.AsStatus()
+		set pResponse.Success=0
+		set pResponse.ErrorMessage=$system.Status.GetErrorText(tStatus)
+	}
+	Quit $$$OK
+]]></Implementation>
+</Method>
+
+<XData name="MessageMap">
+<Data><![CDATA[
+<MapItems>
+	<MapItem MessageType="FHIRFacade.REQ.Patient"> 
+		<Method>Patient</Method>
+	</MapItem>
+	<MapItem MessageType="FHIRFacade.REQ.PatientSearch"> 
+		<Method>PatientSearch</Method>
+	</MapItem>
+</MapItems>
+]]></Data>
+</XData>
+</Class>
+
+
+<Class name="FHIRFacade.BS.Patient">
+<Super>Ens.BusinessService</Super>
+<TimeChanged>66576,57527.8546523</TimeChanged>
+<TimeCreated>66576,44676.5778109</TimeCreated>
+
+<Property name="TargetConfigName">
+<Type>Ens.DataType.ConfigName</Type>
+<InitialExpression>"FHIRFacade.BO.SQL"</InitialExpression>
+</Property>
+
+<Parameter name="SETTINGS">
+<Default>TargetConfigName</Default>
+</Parameter>
+
+<Method name="OnProcessInput">
+<FormalSpec>pInput:%RegisteredObject,*pOutput:%RegisteredObject</FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	#dim tStatus As %Status = $$$OK
+	#dim Err As %Exception.AbstractException
+		
+	Try {
+		Set tStatus = ..SendRequestSync("Patient Database",pInput,.pOutput)
+		$$$ThrowOnError(tStatus)
+	}
+	catch Err{
+		set tStatus = Err.AsStatus()	
+	}
+	return tStatus
+]]></Implementation>
+</Method>
+</Class>
+
+
+<Class name="FHIRFacade.DTL.SDA3.Patient">
+<Super>Ens.DataTransformDTL</Super>
+<TimeChanged>66576,47992.6190337</TimeChanged>
+<TimeCreated>66576,11819.7762949</TimeCreated>
+<DependsOn>FHIRFacade.RES.PatientData,HS.SDA3.Patient</DependsOn>
+
+<Parameter name="IGNOREMISSINGSOURCE">
+<Default>1</Default>
+</Parameter>
+
+<Parameter name="REPORTERRORS">
+<Default>1</Default>
+</Parameter>
+
+<Parameter name="TREATEMPTYREPEATINGFIELDASNULL">
+<Default>0</Default>
+</Parameter>
+
+<XData name="DTL">
+<XMLNamespace>http://www.intersystems.com/dtl</XMLNamespace>
+<Data><![CDATA[
+<transform sourceClass='FHIRFacade.RES.PatientData' targetClass='HS.SDA3.Patient' create='new' language='objectscript' >
+<assign value='source.FirstName' property='target.Name.GivenName' action='set' />
+<assign value='source.LastName' property='target.Name.FamilyName' action='set' />
+<assign value='source.SSN' property='target.PatientNumbers.(1).Number' action='set' />
+<assign value='"MRN"' property='target.PatientNumbers.(1).NumberType' action='set' />
+<assign value='"MinistryOfHealth"' property='target.PatientNumbers.(1).ISOAssigningAuthority' action='set' />
+<assign value='source.Gender' property='target.Gender.Code' action='set' />
+<assign value='source.Deceased' property='target.IsDead' action='set' />
+<assign value='source.InternalId' property='target.MPIID' action='set' />
+</transform>
+]]></Data>
+</XData>
+</Class>
+
+
+<Class name="FHIRFacade.Interactions">
+<Super>HS.FHIRServer.Storage.Json.Interactions</Super>
+<TimeChanged>66621,50301.696864</TimeChanged>
+<TimeCreated>66496,61558.9089758</TimeCreated>
+
+<Method name="Add">
+<FormalSpec>pResourceObj:%DynamicObject,pResourceIdToAssign:%String="",pHttpMethod="POST"</FormalSpec>
+<ReturnType>%String</ReturnType>
+<Implementation><![CDATA[
+	if pResourceObj.resourceType="Patient" {
+		set tResourceObj=##class(FHIRFacade.MyResource.Patient).PatientAdd(pResourceObj,pResourceIdToAssign)
+	}
+	else {
+		$$$ThrowFHIR($$$HSFHIRErrResourceNotSupported,pResourceObj.resourceType,$$$OutcomeNotSupported(404))
+	}
+	return pResourceObj.id
+]]></Implementation>
+</Method>
+
+<Method name="Delete">
+<FormalSpec>pResourceType:%String,pResourceId:%String</FormalSpec>
+<ReturnType>%String</ReturnType>
+<Implementation><![CDATA[
+	if pResourceType="Patient" {
+		set tResourceObj=##class(FHIRFacade.MyResource.Patient).PatientDelete(pResourceId)	
+	}
+	else {
+		$$$ThrowFHIR($$$HSFHIRErrResourceNotSupported,pResourceType,$$$OutcomeNotSupported(404))
+	}
+	return tResourceObj.id
+]]></Implementation>
+</Method>
+
+<Method name="Read">
+<FormalSpec>pResourceType:%String,pResourceId:%String,pVersionId:%String=""</FormalSpec>
+<ReturnType>%DynamicObject</ReturnType>
+<Implementation><![CDATA[
+	if pResourceType="Patient" {
+		set obj=##class(FHIRFacade.MyResource.Patient).PatientRead(pResourceId)
+	}
+	else {
+		$$$ThrowFHIR($$$HSFHIRErrResourceNotSupported,pResourceType,$$$OutcomeNotSupported(404))
+	}
+	return obj
+]]></Implementation>
+</Method>
+
+<Method name="Search">
+<FormalSpec><![CDATA[pResourceType:%String,pCompartment:%String,pCompartmentId:%String,pParameters:HS.FHIRServer.API.Data.QueryParameters="",&pSortKeys=""]]></FormalSpec>
+<ReturnType>HS.FHIRServer.Util.SearchResult</ReturnType>
+<Implementation><![CDATA[
+	set tResultSet=##class(HS.FHIRServer.Util.SearchResult).Create()
+	if pResourceType="Patient" {
+		if pParameters.Count()=0 {
+			// no query parameter
+			$$$FHIRAddError(tResultSet.SearchStatus, $$$ERROR($$$HSFHIRErrInvalidQueryParameter, "No query parameters", $$$OutcomeIs(400, "warning", "incomplete")))
+		}
+		set tResultSet=##class(FHIRFacade.MyResource.Patient).PatientSearch(pParameters)
+	}
+	else {
+		// resource not supported for this interaction
+		$$$ThrowFHIR($$$HSFHIRErrResourceNotSupported,pResourceType,$$$OutcomeNotSupported(404))
+	}
+	return tResultSet
+]]></Implementation>
+</Method>
+</Class>
+
+
+<Class name="FHIRFacade.InteractionsStrategy">
+<Super>HS.FHIRServer.Storage.Json.InteractionsStrategy</Super>
+<TimeChanged>66619,56838.3238536</TimeChanged>
+<TimeCreated>66496,61567.0462902</TimeCreated>
+
+<Parameter name="StrategyKey">
+<Default>MyFacade</Default>
+</Parameter>
+
+<Parameter name="InteractionsClass">
+<Default>FHIRFacade.Interactions</Default>
+</Parameter>
+
+<Method name="GetMetadataResource">
+<ReturnType>%DynamicObject</ReturnType>
+<Implementation><![CDATA[
+	set MyCapabilityStatement = ##super()
+	set iter = MyCapabilityStatement.rest."0".resource.%GetIterator()
+	while iter.%GetNext(.key, .resourceItem) {
+		if resourceItem.type="Patient" {
+			set MyCapabilityStatement.rest."0".resource.%Get(key).interaction=[
+																				{"code": "read"},
+																				{"code": "create"},
+																				{"code": "delete"},
+																				{"code": "search-type"}
+																			  ]
+																			  
+			set MyCapabilityStatement.rest."0".resource.%Get(key).searchParam=[
+																				{"name": "family","type": "string"},
+																				{"name": "gender","type": "token"},
+																				{"name": "identifier","type": "token"}
+																			  ]
+                     
+		}
+	}
+	
+	return MyCapabilityStatement
+]]></Implementation>
+</Method>
+
+<Method name="GetCapabilityTemplate">
+<Description>
+@API - 
+NOTE: This method is defined in the HS.FHIRServer.Storage.Json.InteractionsStrategy class.  Subclasses may
+override.</Description>
+<ReturnType>%DynamicObject</ReturnType>
+<Implementation><![CDATA[
+	Set json = {
+		  "resourceType": "CapabilityStatement",
+		  "id": "InterSystemsFHIRServer",
+		  "meta": {
+		    "versionId": "1",
+	    	"lastUpdated": ($zdatetime($horolog,3,7))  //replaced at runtime, but must match 'instant' syntax
+		  },
+		  "url": "<replaced-at-runtime>",
+		  "version": "1",
+		  "name": "InterSystems FHIR Server CapabilityStatement",
+		  "status": "active",
+		  "experimental": false,
+		  "date": ($zdate($horolog, 3)),
+		  "publisher": "InterSystems Corporation 1",
+		  "kind": "instance",
+		  "software": {
+		    "name": ("InterSystems " _ $select(##class(%ZHSLIB.HealthShareMgr).InstanceType()=$$$HSisHealthShare:"HealthShare Unified Care Record",
+		    								##class(%ZHSLIB.HealthShareMgr).InstanceType()=$$$HSisIRISforHealth:"IRIS for Health",
+		    								##class(%ZHSLIB.HealthShareMgr).InstanceType()=$$$HSisHealthConnect:"Health Connect",
+		    								1:"")),
+		    "version": (##class(%ZHSLIB.HealthShareMgr).VersionInfo())
+		  },
+		  "implementation": {
+		    "description": "InterSystems FHIR Server 11",
+		    "url": "<replaced-at-runtime>"
+		  },
+		  "fhirVersion": "<replaced-by-builder>",
+		  "acceptUnknown": "no",
+		  "format": [
+		    "xml",
+		    "json"
+		  ],
+		  "patchFormat": [
+		  	"application/json-patch+json"
+		  ],
+		  "rest": [
+		  ]
+	}
+	return json
+]]></Implementation>
+</Method>
+</Class>
+
+
+<Class name="FHIRFacade.MyResource.Patient">
+<IncludeCode>HS.FHIRServer</IncludeCode>
+<Super>%RegisteredObject</Super>
+<TimeChanged>66621,50588.4861942</TimeChanged>
+<TimeCreated>66496,61567.0462902</TimeCreated>
+
+<Method name="PatientAdd">
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResourceObj:%DynamicObject,pResourceIdToAssign:%String=""</FormalSpec>
+<ReturnType>%DynamicObject</ReturnType>
+<Implementation><![CDATA[
+	#dim tService as Ens.BusinessService
+
+	//--------------------
+	// Instantiate the BS
+	//--------------------
+	set tStatus=##class(Ens.Director).CreateBusinessService("Patient BS",.tService)
+	if $$$ISERR(tStatus) $$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+		
+	//-------------------------
+	// Create request+response
+	//-------------------------
+	set tResponse					= ##class(FHIRFacade.RES.Patient).%New()
+	set tRequest					= ##class(FHIRFacade.REQ.Patient).%New()
+	set tRequest.Action				= "Add"
+	set tRequest.Gender				= pResourceObj.gender
+	set tRequest.Deceased			= pResourceObj.deceasedBoolean
+	if pResourceObj.identifier.%Size()>0 {
+		set tRequest.SSN			= pResourceObj.identifier."0".value
+	}
+	if pResourceObj.name.%Size()>0 {
+		set tRequest.LastName		= pResourceObj.name."0".family
+		if pResourceObj.name."0".given.%Size()>0 {
+			set tRequest.FirstName	= pResourceObj.name."0".given."0"
+		}
+	}
+	
+	//------------------
+	// Send the request
+	//------------------
+	set tStatus=tService.ProcessInput(tRequest,.tResponse)
+	if $$$ISOK(tStatus) {
+		if tResponse.Success {
+			//------------------------------------------------------------
+			// Fill in the required meta properties for the FHIR response
+			//------------------------------------------------------------
+			set pResourceObj.id=tResponse.PatientData.InternalId
+			set pResourceObj.meta={}
+			set pResourceObj.meta.versionId=1
+			set pResourceObj.meta.lastUpdated=$zdt($h,3,1,3)
+		}
+		else {
+			$$$ThrowFHIR($$$GeneralError, tResponse.ErrorMessage, $$$OutcomeInvalid(500))
+		}
+	}
+	else {
+		$$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+	}
+ return pResourceObj
+]]></Implementation>
+</Method>
+
+<Method name="PatientDelete">
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResourceId:%String</FormalSpec>
+<ReturnType>%DynamicObject</ReturnType>
+<Implementation><![CDATA[
+	#dim tService as Ens.BusinessService
+	set pResourceObj={}
+		
+
+	//--------------------
+	// Instantiate the BS
+	//--------------------
+	set tStatus=##class(Ens.Director).CreateBusinessService("Patient BS",.tService)
+	if $$$ISERR(tStatus) $$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+	
+	//-------------------------
+	// Create request+response
+	//-------------------------
+	set tResponse					= ##class(FHIRFacade.RES.Patient).%New()
+	set tRequest					= ##class(FHIRFacade.REQ.Patient).%New()
+	set tRequest.Action				= "Delete"
+	set tRequest.InternalId			= pResourceId
+	
+	//------------------
+	// Send the request
+	//------------------
+	set tStatus=tService.ProcessInput(tRequest,.tResponse)
+	if $$$ISOK(tStatus) {
+		if tResponse.Success {
+			//------------------------------------------------------------
+			// Fill in the required meta properties for the FHIR response
+			//------------------------------------------------------------
+			set pResourceObj.id=tResponse.PatientData.InternalId
+		}
+		else {
+			$$$ThrowFHIR($$$GeneralError, tResponse.ErrorMessage, $$$OutcomeInvalid(500))
+		}
+	}
+	else {
+		$$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+	}
+	return pResourceObj
+]]></Implementation>
+</Method>
+
+<Method name="PatientRead">
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pResourceId:%String</FormalSpec>
+<ReturnType>%DynamicObject</ReturnType>
+<Implementation><![CDATA[
+	#dim tService as Ens.BusinessService
+	set pResourceObj={}
+	
+	//--------------------
+	// Instantiate the BS
+	//--------------------
+	set tStatus=##class(Ens.Director).CreateBusinessService("Patient BS",.tService)
+	if $$$ISERR(tStatus) $$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+		
+	//-------------------------
+	// Create request+response
+	//-------------------------
+	set tResponse			= ##class(FHIRFacade.RES.Patient).%New()
+	set tRequest			= ##class(FHIRFacade.REQ.Patient).%New()
+	set tRequest.Action		= "Read"
+	set tRequest.InternalId	= pResourceId
+	//------------------
+	// Send the request
+	//------------------
+	set tStatus=tService.ProcessInput(tRequest,.tResponse)
+	if $$$ISOK(tStatus) {
+		if tResponse.Success {
+			//------------------------------------------
+			//Transform Query Response to a SDA Patient
+			//------------------------------------------
+			set tSDAPatient = ##class(HS.SDA3.Patient).%New()
+			Set tStatus = ##Class(FHIRFacade.DTL.SDA3.Patient).Transform(tResponse.PatientData,.tSDAPatient)
+			if $$$ISERR(tStatus) $$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+			
+			//----------------------------------------------
+			//Transform a SDA Patient SDA to a FHIR Patient
+			//----------------------------------------------
+			
+			set tBundle = ##class(HS.FHIR.DTL.Util.API.Transform.SDA3ToFHIR).TransformObject(tSDAPatient,"R4",pResourceId)
+			if tBundle.bundle.entry.%size>0 {
+				set pResourceObj=tBundle.bundle.entry.%Get(0).resource
+			}
+			else {
+				$$$ThrowFHIR($$$GeneralError, "Patient not found", $$$OutcomeNotFound)
+			}		
+		}
+		else {
+			$$$ThrowFHIR($$$GeneralError, tResponse.ErrorMessage, $$$OutcomeInvalid(500))
+		}
+	}
+	else {
+		$$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+	}
+	return pResourceObj
+]]></Implementation>
+</Method>
+
+<Method name="PatientSearch">
+<ClassMethod>1</ClassMethod>
+<FormalSpec>pParameters:HS.FHIRServer.API.Data.QueryParameters=""</FormalSpec>
+<ReturnType>HS.FHIRServer.Util.SearchResult</ReturnType>
+<Implementation><![CDATA[
+	set tResultSet=##class(HS.FHIRServer.Util.SearchResult).Create()
+	
+	//-------------------------
+	// Create request+response
+	//-------------------------
+	set tRequest	=##class(FHIRFacade.REQ.PatientSearch).%New()
+	set tResponse 	=##class(FHIRFacade.RES.PatientSearch).%New()
+
+	//------------------------------------------------------------
+	// Fill the request according to the allowed query parameters
+	//------------------------------------------------------------
+	for i=1:1:pParameters.Count() {
+		set pName	=$zconvert(pParameters.GetAt(i).name,"L")
+		set pValue	=pParameters.GetAt(i).value
+			
+		//-----------------------------------------------------------------
+		// /Patient?identifier=http://hl7.org/fhir/sid/us-ssn|121-62-67521
+		//-----------------------------------------------------------------
+		if pName="identifier" {
+			set system	=$piece(pValue,"|",1)
+			set id		=$piece(pValue,"|",2)
+
+			// empty id
+			if id="" {
+				$$$FHIRAddError(tResultSet.SearchStatus, $$$ERROR($$$HSFHIRErrInvalidQueryParameterValue, pName, id))
+				quit
+			}
+			// searching by another system than 'us-ssn'
+			if system'="http://hl7.org/fhir/sid/us-ssn" {
+				$$$FHIRAddError(tResultSet.SearchStatus, $$$ERROR($$$HSFHIRErrInvalidQueryParameterValue, pName,system))
+				quit
+			}
+			set tRequest.SSN=id
+		}
+		//------------------------
+		// /Patient?gender=female
+		//------------------------
+		elseif pName="gender" {
+			// empty gender
+			if pValue="" {
+				$$$FHIRAddError(tResultSet.SearchStatus, $$$ERROR($$$HSFHIRErrInvalidQueryParameterValue, pName, pValue))
+				quit
+			}
+			set tRequest.Gender=pValue
+		}
+		//-------------------------
+		// /Patient?family=skubach
+		//-------------------------
+		elseif pName="family" {
+			// empty last name
+			if pValue="" {
+				$$$FHIRAddError(tResultSet.SearchStatus, $$$ERROR($$$HSFHIRErrInvalidQueryParameterValue, pName, pValue))
+				quit
+			}
+			set tRequest.LastName=pValue
+		}
+		else {
+			// only the identifier/gender/family query parametrs are allowed in this FHIR Facade
+			$$$FHIRAddError(tResultSet.SearchStatus, $$$ERROR($$$HSFHIRErrParameterNotSupported, pName,""))
+			quit
+		}
+	}			
+
+	if $$$ISERR(tResultSet.SearchStatus) $$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tResultSet.SearchStatus), $$$OutcomeInvalid(500))
+	//--------------------
+	// Instantiate the BS
+	//--------------------
+	set tStatus=##class(Ens.Director).CreateBusinessService("Patient BS",.tService)
+	if $$$ISERR(tStatus) $$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+	
+	set tStatus=tService.ProcessInput(tRequest,.tResponse)
+	if $$$ISOK(tStatus) {
+		
+		if tResponse.Success {
+			for i=1:1:tResponse.Patients.Count() {
+				
+				//----------------------------------------
+				//Transform patient data to a SDA Patient
+				//----------------------------------------
+				set tSDAPatient = ##class(HS.SDA3.Patient).%New()
+				Set tStatus = ##Class(FHIRFacade.DTL.SDA3.Patient).Transform(tResponse.Patients.GetAt(i),.tSDAPatient)
+				if $$$ISERR(tStatus) $$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+				
+				//----------------------------------------------
+				//Transform a SDA Patient SDA to a FHIR Patient
+				//----------------------------------------------
+				set tBundle = ##class(HS.FHIR.DTL.Util.API.Transform.SDA3ToFHIR).TransformObject(tSDAPatient,"R4")
+				if tBundle.bundle.entry.%size>0 {
+					set tResourceObj=tBundle.bundle.entry.%Get(0).resource
+				}
+				else {
+					$$$ThrowFHIR($$$GeneralError, "SDA Error", $$$OutcomeInvalid(500))
+				}		
+								
+				//----------------------------------------
+				// add the found patient to the resultset
+				//----------------------------------------
+				set resourceId		= tResponse.Patients.GetAt(i).InternalId
+				set patientId		= tResponse.Patients.GetAt(i).InternalId
+				set tResourceObj.id	= resourceId
+				set Row = tResultSet.AddRow(i,"Patient",resourceId,1, "match",,tResourceObj,,patientId)
+				kill tFHIRPatient,tSDAPatient
+			}
+		}
+		else {
+			$$$ThrowFHIR($$$GeneralError, tResponse.ErrorMessage, $$$OutcomeInvalid(500))
+		}
+	}		
+	else {
+		$$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
+	}
+	
+	return tResultSet
+]]></Implementation>
+</Method>
+</Class>
+
+
+<Class name="FHIRFacade.PROD.FoundationProduction">
+<ProcedureBlock>0</ProcedureBlock>
+<Super>Ens.Production</Super>
+<TimeChanged>66576,56236.6421901</TimeChanged>
+<TimeCreated>66575,47591.187863</TimeCreated>
+
+<XData name="ProductionDefinition">
+<Data><![CDATA[
+<Production Name="FHIRFacade.PROD.FoundationProduction" LogGeneralTraceEvents="false">
+  <Description></Description>
+  <ActorPoolSize>1</ActorPoolSize>
+  <Item Name="Patient BS" Category="" ClassName="FHIRFacade.BS.Patient" PoolSize="0" Enabled="true" Foreground="false" Comment="" LogTraceEvents="false" Schedule="">
+    <Setting Target="Host" Name="TargetConfigName"></Setting>
+  </Item>
+  <Item Name="Patient Database" Category="" ClassName="FHIRFacade.BO.Database" PoolSize="1" Enabled="true" Foreground="false" Comment="" LogTraceEvents="true" Schedule="">
+  </Item>
+</Production>
+]]></Data>
+</XData>
+</Class>
+
+
+<Class name="FHIRFacade.REQ.Patient">
+<Super>Ens.Response</Super>
+<TimeChanged>66576,44972.7250566</TimeChanged>
+<TimeCreated>66575,81558.3995778</TimeCreated>
+
+<Property name="Action">
+<Type>%String</Type>
+<Parameter name="VALUELIST" value=",Add,Delete,Update,Read"/>
+</Property>
+
+<Property name="InternalId">
+<Type>%Integer</Type>
+</Property>
+
+<Property name="FirstName">
+<Type>%String</Type>
+</Property>
+
+<Property name="LastName">
+<Type>%String</Type>
+</Property>
+
+<Property name="SSN">
+<Type>%String</Type>
+</Property>
+
+<Property name="Gender">
+<Type>%String</Type>
+</Property>
+
+<Property name="Deceased">
+<Type>%Boolean</Type>
+</Property>
+
+<Storage name="Default">
+<Type>%Storage.Persistent</Type>
+<DefaultData>PatientDefaultData</DefaultData>
+<Data name="PatientDefaultData">
+<Structure>listnode</Structure>
+<Subscript>"Patient"</Subscript>
+<Value name="1">
+<Value>Action</Value>
+</Value>
+<Value name="2">
+<Value>InternalId</Value>
+</Value>
+<Value name="3">
+<Value>FirstName</Value>
+</Value>
+<Value name="4">
+<Value>LastName</Value>
+</Value>
+<Value name="5">
+<Value>SSN</Value>
+</Value>
+<Value name="6">
+<Value>Gender</Value>
+</Value>
+<Value name="7">
+<Value>Deceased</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+
+
+<Class name="FHIRFacade.REQ.PatientSearch">
+<Super>Ens.Response</Super>
+<TimeChanged>66576,45412.1878738</TimeChanged>
+<TimeCreated>66575,81558.3995778</TimeCreated>
+
+<Property name="LastName">
+<Type>%String</Type>
+</Property>
+
+<Property name="SSN">
+<Type>%String</Type>
+</Property>
+
+<Property name="Gender">
+<Type>%String</Type>
+</Property>
+
+<Storage name="Default">
+<Type>%Storage.Persistent</Type>
+<DefaultData>PatientSearchDefaultData</DefaultData>
+<Data name="PatientSearchDefaultData">
+<Structure>listnode</Structure>
+<Subscript>"PatientSearch"</Subscript>
+<Value name="1">
+<Value>LastName</Value>
+</Value>
+<Value name="2">
+<Value>SSN</Value>
+</Value>
+<Value name="3">
+<Value>Gender</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+
+
+<Class name="FHIRFacade.RES.Patient">
+<Super>Ens.Response</Super>
+<TimeChanged>66576,47406.9552665</TimeChanged>
+<TimeCreated>66575,81558.3995778</TimeCreated>
+
+<Property name="Success">
+<Type>%Boolean</Type>
+<InitialExpression>1</InitialExpression>
+</Property>
+
+<Property name="ErrorMessage">
+<Type>%String</Type>
+<Parameter name="MAXLEN" value="500"/>
+</Property>
+
+<Property name="PatientData">
+<Type>FHIRFacade.RES.PatientData</Type>
+</Property>
+
+<Storage name="Default">
+<Type>%Storage.Persistent</Type>
+<DefaultData>PatientDefaultData</DefaultData>
+<Data name="PatientDefaultData">
+<Structure>listnode</Structure>
+<Subscript>"Patient"</Subscript>
+<Value name="1">
+<Value>Success</Value>
+</Value>
+<Value name="2">
+<Value>ErrorMessage</Value>
+</Value>
+<Value name="3">
+<Value>PatientData</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+
+
+<Class name="FHIRFacade.RES.PatientData">
+<Super>%SerialObject,%XML.Adaptor</Super>
+<TimeChanged>66576,47560.2856603</TimeChanged>
+<TimeCreated>66575,81558.3995778</TimeCreated>
+
+<Property name="InternalId">
+<Type>%Integer</Type>
+</Property>
+
+<Property name="FirstName">
+<Type>%String</Type>
+</Property>
+
+<Property name="LastName">
+<Type>%String</Type>
+</Property>
+
+<Property name="SSN">
+<Type>%String</Type>
+</Property>
+
+<Property name="Gender">
+<Type>%String</Type>
+</Property>
+
+<Property name="Deceased">
+<Type>%Boolean</Type>
+</Property>
+
+<Storage name="Default">
+<Type>%Storage.Serial</Type>
+<State>PatientDataState</State>
+<StreamLocation>^FHIRFacade.RES.PatientDataS</StreamLocation>
+<Data name="PatientDataState">
+<Structure>listnode</Structure>
+<Subscript/>
+<Value name="1">
+<Value>InternalId</Value>
+</Value>
+<Value name="2">
+<Value>FirstName</Value>
+</Value>
+<Value name="3">
+<Value>LastName</Value>
+</Value>
+<Value name="4">
+<Value>SSN</Value>
+</Value>
+<Value name="5">
+<Value>Gender</Value>
+</Value>
+<Value name="6">
+<Value>Deceased</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+
+
+<Class name="FHIRFacade.RES.PatientSearch">
+<Super>Ens.Response</Super>
+<TimeChanged>66576,47513.1304774</TimeChanged>
+<TimeCreated>66575,81558.3995778</TimeCreated>
+
+<Property name="Success">
+<Type>%Boolean</Type>
+<InitialExpression>1</InitialExpression>
+</Property>
+
+<Property name="ErrorMessage">
+<Type>%String</Type>
+<Parameter name="MAXLEN" value="500"/>
+</Property>
+
+<Property name="Patients">
+<Type>FHIRFacade.RES.PatientData</Type>
+<Collection>list</Collection>
+</Property>
+
+<Storage name="Default">
+<Type>%Storage.Persistent</Type>
+<DefaultData>PatientSearchDefaultData</DefaultData>
+<Data name="PatientSearchDefaultData">
+<Structure>listnode</Structure>
+<Subscript>"PatientSearch"</Subscript>
+<Value name="1">
+<Value>Success</Value>
+</Value>
+<Value name="2">
+<Value>ErrorMessage</Value>
+</Value>
+<Value name="3">
+<Value>Patients</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+
+
+<Class name="FHIRFacade.RepoManager">
+<Super>HS.FHIRServer.Storage.Json.RepoManager</Super>
+<TimeChanged>66576,63284.951116</TimeChanged>
+<TimeCreated>66496,61569.7393169</TimeCreated>
+
+<Parameter name="StrategyKey">
+<Default>MyFacade</Default>
+</Parameter>
+
+<Parameter name="StrategyClass">
+<Default>FHIRFacade.InteractionsStrategy</Default>
+</Parameter>
+</Class>
+
+
+<Class name="FHIRFacade.Table.Patient">
+<Super>%Persistent</Super>
+<TimeChanged>66576,47594.3180447</TimeChanged>
+<TimeCreated>66575,81558.3995778</TimeCreated>
+
+<Property name="FirstName">
+<Type>%String</Type>
+</Property>
+
+<Property name="LastName">
+<Type>%String</Type>
+</Property>
+
+<Property name="SSN">
+<Type>%String</Type>
+</Property>
+
+<Index name="SSNIndex">
+<Properties>SSN</Properties>
+<Unique>1</Unique>
+</Index>
+
+<Property name="Gender">
+<Type>%String</Type>
+</Property>
+
+<Property name="Deceased">
+<Type>%Boolean</Type>
+<InitialExpression>0</InitialExpression>
+</Property>
+
+<Storage name="Default">
+<Type>%Storage.Persistent</Type>
+<DataLocation>^FHIRFacade.Table.PatientD</DataLocation>
+<DefaultData>PatientDefaultData</DefaultData>
+<IdLocation>^FHIRFacade.Table.PatientD</IdLocation>
+<IndexLocation>^FHIRFacade.Table.PatientI</IndexLocation>
+<StreamLocation>^FHIRFacade.Table.PatientS</StreamLocation>
+<ExtentSize>3</ExtentSize>
+<Data name="PatientDefaultData">
+<Structure>listnode</Structure>
+<Subscript/>
+<Value name="1">
+<Value>%%CLASSNAME</Value>
+</Value>
+<Value name="2">
+<Value>FirstName</Value>
+</Value>
+<Value name="3">
+<Value>LastName</Value>
+</Value>
+<Value name="4">
+<Value>SSN</Value>
+</Value>
+<Value name="5">
+<Value>Gender</Value>
+</Value>
+<Value name="6">
+<Value>Deceased</Value>
+</Value>
+</Data>
+<Property name="%%CLASSNAME">
+<Selectivity>100.0000%</Selectivity>
+<AverageFieldSize>2</AverageFieldSize>
+</Property>
+<Property name="%%ID">
+<Selectivity>1</Selectivity>
+<AverageFieldSize>3</AverageFieldSize>
+</Property>
+<Property name="Deceased">
+<Selectivity>100.0000%</Selectivity>
+<AverageFieldSize>2</AverageFieldSize>
+</Property>
+<Property name="FirstName">
+<Selectivity>100.0000%</Selectivity>
+<AverageFieldSize>9</AverageFieldSize>
+</Property>
+<Property name="Gender">
+<Selectivity>100.0000%</Selectivity>
+<AverageFieldSize>6</AverageFieldSize>
+</Property>
+<Property name="LastName">
+<Selectivity>100.0000%</Selectivity>
+<AverageFieldSize>7</AverageFieldSize>
+</Property>
+<Property name="SSN">
+<Selectivity>1</Selectivity>
+<AverageFieldSize>14.67</AverageFieldSize>
+</Property>
+<SQLMap name="IDKEY">
+<BlockCount>-4</BlockCount>
+</SQLMap>
+<SQLMap name="SSNIndex">
+<BlockCount>-4</BlockCount>
+</SQLMap>
+</Storage>
+</Class>
+
+
+</Export>
