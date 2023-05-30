@@ -1,0 +1,374 @@
+{
+	"info": {
+		"_postman_id": "a5fe76d4-2e1f-4e46-80e5-41e0fd04f457",
+		"name": "FHIR Façade",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24205286"
+	},
+	"item": [
+		{
+			"name": "Create a Patient",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/fhir+json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"resourceType\": \"Patient\",\r\n    \"deceasedBoolean\": false,\r\n    \"gender\": \"male\",\r\n    \"identifier\": [\r\n        {\r\n            \"type\": {\r\n                \"coding\": [\r\n                    {\r\n                        \"code\": \"ssn\",\r\n                        \"system\": \"http://hl7.org/fhir/sid/us-ssn\"\r\n                    }\r\n                ],\r\n                \"text\": \"ssn\"\r\n            },\r\n            \"value\": \"121-62-6751\"\r\n        }\r\n    ],\r\n    \"name\": [\r\n        {\r\n            \"family\": \"Xenia\",\r\n            \"given\": [\r\n                \"Juanita\"\r\n            ],\r\n            \"text\": \"Juanita Xenia\",\r\n            \"use\": \"official\"\r\n        }\r\n    ],\r\n    \"id\": \"139\"\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:52779/csp/healthshare/fhirfacade/fhir/r4Facade/Patient",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52779",
+					"path": [
+						"csp",
+						"healthshare",
+						"fhirfacade",
+						"fhir",
+						"r4Facade",
+						"Patient"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete a Patient",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/fhir+json",
+						"type": "text"
+					},
+					{
+						"key": "resource",
+						"value": "45",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"resourceType\": \"Patient\",\r\n    \"id\" : \"45\",\r\n    \"deceasedBoolean\": false,\r\n    \"gender\": \"male\",\r\n    \"identifier\": [\r\n        {\r\n            \"type\": {\r\n                \"coding\": [\r\n                    {\r\n                        \"code\": \"ssn\",\r\n                        \"system\": \"http://hl7.org/fhir/sid/us-ssn\"\r\n                    }\r\n                ],\r\n                \"text\": \"ssn\"\r\n            },\r\n            \"value\": \"121-62-6751\"\r\n        }\r\n    ],\r\n    \"name\": [\r\n        {\r\n            \"family\": \"Xenia\",\r\n            \"given\": [\r\n                \"Juanita\"\r\n            ],\r\n            \"text\": \"Juanita Xenia\",\r\n            \"use\": \"official\"\r\n        }\r\n    ],\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:52779/csp/healthshare/fhirfacade/fhir/r4Facade/Patient/45",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52779",
+					"path": [
+						"csp",
+						"healthshare",
+						"fhirfacade",
+						"fhir",
+						"r4Facade",
+						"Patient",
+						"45"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Read a Patient",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/fhir+json",
+						"type": "text"
+					},
+					{
+						"key": "resource",
+						"value": "45",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"resourceType\": \"Patient\",\r\n    \"id\" : \"45\",\r\n    \"deceasedBoolean\": false,\r\n    \"gender\": \"male\",\r\n    \"identifier\": [\r\n        {\r\n            \"type\": {\r\n                \"coding\": [\r\n                    {\r\n                        \"code\": \"ssn\",\r\n                        \"system\": \"http://hl7.org/fhir/sid/us-ssn\"\r\n                    }\r\n                ],\r\n                \"text\": \"ssn\"\r\n            },\r\n            \"value\": \"121-62-6751\"\r\n        }\r\n    ],\r\n    \"name\": [\r\n        {\r\n            \"family\": \"Xenia\",\r\n            \"given\": [\r\n                \"Juanita\"\r\n            ],\r\n            \"text\": \"Juanita Xenia\",\r\n            \"use\": \"official\"\r\n        }\r\n    ],\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:52779/csp/healthshare/fhirfacade/fhir/r4Facade/Patient/11",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52779",
+					"path": [
+						"csp",
+						"healthshare",
+						"fhirfacade",
+						"fhir",
+						"r4Facade",
+						"Patient",
+						"11"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search a Patient by SSN",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/fhir+json",
+						"type": "text"
+					},
+					{
+						"key": "resource",
+						"value": "45",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"resourceType\": \"Patient\",\r\n    \"id\" : \"45\",\r\n    \"deceasedBoolean\": false,\r\n    \"gender\": \"male\",\r\n    \"identifier\": [\r\n        {\r\n            \"type\": {\r\n                \"coding\": [\r\n                    {\r\n                        \"code\": \"ssn\",\r\n                        \"system\": \"http://hl7.org/fhir/sid/us-ssn\"\r\n                    }\r\n                ],\r\n                \"text\": \"ssn\"\r\n            },\r\n            \"value\": \"121-62-6751\"\r\n        }\r\n    ],\r\n    \"name\": [\r\n        {\r\n            \"family\": \"Xenia\",\r\n            \"given\": [\r\n                \"Juanita\"\r\n            ],\r\n            \"text\": \"Juanita Xenia\",\r\n            \"use\": \"official\"\r\n        }\r\n    ],\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:52779/csp/healthshare/fhirfacade/fhir/r4Facade/Patient?identifier=http://hl7.org/fhir/sid/us-ssn|121-62-6752111",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52779",
+					"path": [
+						"csp",
+						"healthshare",
+						"fhirfacade",
+						"fhir",
+						"r4Facade",
+						"Patient"
+					],
+					"query": [
+						{
+							"key": "identifier",
+							"value": "http://hl7.org/fhir/sid/us-ssn|121-62-6752111"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search a Patient by last name",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/fhir+json",
+						"type": "text"
+					},
+					{
+						"key": "resource",
+						"value": "45",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"resourceType\": \"Patient\",\r\n    \"id\" : \"45\",\r\n    \"deceasedBoolean\": false,\r\n    \"gender\": \"male\",\r\n    \"identifier\": [\r\n        {\r\n            \"type\": {\r\n                \"coding\": [\r\n                    {\r\n                        \"code\": \"ssn\",\r\n                        \"system\": \"http://hl7.org/fhir/sid/us-ssn\"\r\n                    }\r\n                ],\r\n                \"text\": \"ssn\"\r\n            },\r\n            \"value\": \"121-62-6751\"\r\n        }\r\n    ],\r\n    \"name\": [\r\n        {\r\n            \"family\": \"Xenia\",\r\n            \"given\": [\r\n                \"Juanita\"\r\n            ],\r\n            \"text\": \"Juanita Xenia\",\r\n            \"use\": \"official\"\r\n        }\r\n    ],\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:52779/csp/healthshare/fhirfacade/fhir/r4Facade/Patient?identifier=http://hl7.org/fhir/sid/us-ssn|121-62-67521",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52779",
+					"path": [
+						"csp",
+						"healthshare",
+						"fhirfacade",
+						"fhir",
+						"r4Facade",
+						"Patient"
+					],
+					"query": [
+						{
+							"key": "identifier",
+							"value": "http://hl7.org/fhir/sid/us-ssn|121-62-67521"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search a Patient by gender",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/fhir+json",
+						"type": "text"
+					},
+					{
+						"key": "resource",
+						"value": "45",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"resourceType\": \"Patient\",\r\n    \"id\" : \"45\",\r\n    \"deceasedBoolean\": false,\r\n    \"gender\": \"male\",\r\n    \"identifier\": [\r\n        {\r\n            \"type\": {\r\n                \"coding\": [\r\n                    {\r\n                        \"code\": \"ssn\",\r\n                        \"system\": \"http://hl7.org/fhir/sid/us-ssn\"\r\n                    }\r\n                ],\r\n                \"text\": \"ssn\"\r\n            },\r\n            \"value\": \"121-62-6751\"\r\n        }\r\n    ],\r\n    \"name\": [\r\n        {\r\n            \"family\": \"Xenia\",\r\n            \"given\": [\r\n                \"Juanita\"\r\n            ],\r\n            \"text\": \"Juanita Xenia\",\r\n            \"use\": \"official\"\r\n        }\r\n    ],\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:52779/csp/healthshare/fhirfacade/fhir/r4Facade/Patient?gender=female",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52779",
+					"path": [
+						"csp",
+						"healthshare",
+						"fhirfacade",
+						"fhir",
+						"r4Facade",
+						"Patient"
+					],
+					"query": [
+						{
+							"key": "gender",
+							"value": "female"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search a Patient by all",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/fhir+json",
+						"type": "text"
+					},
+					{
+						"key": "resource",
+						"value": "45",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"resourceType\": \"Patient\",\r\n    \"id\" : \"45\",\r\n    \"deceasedBoolean\": false,\r\n    \"gender\": \"male\",\r\n    \"identifier\": [\r\n        {\r\n            \"type\": {\r\n                \"coding\": [\r\n                    {\r\n                        \"code\": \"ssn\",\r\n                        \"system\": \"http://hl7.org/fhir/sid/us-ssn\"\r\n                    }\r\n                ],\r\n                \"text\": \"ssn\"\r\n            },\r\n            \"value\": \"121-62-6751\"\r\n        }\r\n    ],\r\n    \"name\": [\r\n        {\r\n            \"family\": \"Xenia\",\r\n            \"given\": [\r\n                \"Juanita\"\r\n            ],\r\n            \"text\": \"Juanita Xenia\",\r\n            \"use\": \"official\"\r\n        }\r\n    ],\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:52779/csp/healthshare/fhirfacade/fhir/r4Facade/Patient?gender=female",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52779",
+					"path": [
+						"csp",
+						"healthshare",
+						"fhirfacade",
+						"fhir",
+						"r4Facade",
+						"Patient"
+					],
+					"query": [
+						{
+							"key": "gender",
+							"value": "female"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Capability statement",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/fhir+json",
+						"type": "text"
+					},
+					{
+						"key": "resource",
+						"value": "45",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"resourceType\": \"Patient\",\r\n    \"id\" : \"45\",\r\n    \"deceasedBoolean\": false,\r\n    \"gender\": \"male\",\r\n    \"identifier\": [\r\n        {\r\n            \"type\": {\r\n                \"coding\": [\r\n                    {\r\n                        \"code\": \"ssn\",\r\n                        \"system\": \"http://hl7.org/fhir/sid/us-ssn\"\r\n                    }\r\n                ],\r\n                \"text\": \"ssn\"\r\n            },\r\n            \"value\": \"121-62-6751\"\r\n        }\r\n    ],\r\n    \"name\": [\r\n        {\r\n            \"family\": \"Xenia\",\r\n            \"given\": [\r\n                \"Juanita\"\r\n            ],\r\n            \"text\": \"Juanita Xenia\",\r\n            \"use\": \"official\"\r\n        }\r\n    ],\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:52779/csp/healthshare/fhirfacade/fhir/r4Facade/Patient?gender=female",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "52779",
+					"path": [
+						"csp",
+						"healthshare",
+						"fhirfacade",
+						"fhir",
+						"r4Facade",
+						"Patient"
+					],
+					"query": [
+						{
+							"key": "gender",
+							"value": "female"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
