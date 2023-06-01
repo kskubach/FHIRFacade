@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Export generator="IRIS" version="26" zv="IRIS for Windows (x86-64) 2022.3 (Build 606U)" ts="2023-05-27 14:40:10">
+<Export generator="IRIS" version="26" zv="IRIS for Windows (x86-64) 2022.3 (Build 606U)" ts="2023-06-01 12:14:51">
 <Class name="FHIRFacade.BO.Database">
 <Super>Ens.BusinessOperation</Super>
 <TimeChanged>66619,44262.1015475</TimeChanged>
@@ -268,7 +268,7 @@
 
 <Class name="FHIRFacade.Interactions">
 <Super>HS.FHIRServer.Storage.Json.Interactions</Super>
-<TimeChanged>66621,50301.696864</TimeChanged>
+<TimeChanged>66626,43113.5583633</TimeChanged>
 <TimeCreated>66496,61558.9089758</TimeCreated>
 
 <Method name="Add">
@@ -289,13 +289,14 @@
 <FormalSpec>pResourceType:%String,pResourceId:%String</FormalSpec>
 <ReturnType>%String</ReturnType>
 <Implementation><![CDATA[
+	set vId=""
 	if pResourceType="Patient" {
-		set tResourceObj=##class(FHIRFacade.MyResource.Patient).PatientDelete(pResourceId)	
+		set vId=##class(FHIRFacade.MyResource.Patient).PatientDelete(pResourceId)
 	}
 	else {
 		$$$ThrowFHIR($$$HSFHIRErrResourceNotSupported,pResourceType,$$$OutcomeNotSupported(404))
 	}
-	return tResourceObj.id
+	return vId
 ]]></Implementation>
 </Method>
 
@@ -429,7 +430,7 @@ override.</Description>
 <Class name="FHIRFacade.MyResource.Patient">
 <IncludeCode>HS.FHIRServer</IncludeCode>
 <Super>%RegisteredObject</Super>
-<TimeChanged>66621,50588.4861942</TimeChanged>
+<TimeChanged>66626,43325.8213569</TimeChanged>
 <TimeCreated>66496,61567.0462902</TimeCreated>
 
 <Method name="PatientAdd">
@@ -491,10 +492,10 @@ override.</Description>
 <Method name="PatientDelete">
 <ClassMethod>1</ClassMethod>
 <FormalSpec>pResourceId:%String</FormalSpec>
-<ReturnType>%DynamicObject</ReturnType>
+<ReturnType>%String</ReturnType>
 <Implementation><![CDATA[
 	#dim tService as Ens.BusinessService
-	set pResourceObj={}
+	set VersionId=""
 		
 
 	//--------------------
@@ -520,16 +521,16 @@ override.</Description>
 			//------------------------------------------------------------
 			// Fill in the required meta properties for the FHIR response
 			//------------------------------------------------------------
-			set pResourceObj.id=tResponse.PatientData.InternalId
+			set VersionId=1
 		}
 		else {
-			$$$ThrowFHIR($$$GeneralError, tResponse.ErrorMessage, $$$OutcomeInvalid(500))
+			$$$ThrowFHIR($$$GeneralError, tResponse.ErrorMessage, $$$OutcomeNotFound)
 		}
 	}
 	else {
 		$$$ThrowFHIR($$$GeneralError, $system.Status.GetErrorText(tStatus), $$$OutcomeInvalid(500))
 	}
-	return pResourceObj
+ return VersionId
 ]]></Implementation>
 </Method>
 
